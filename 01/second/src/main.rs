@@ -6,7 +6,6 @@ fn main() {
     let mut count = 0;
 
     let line_count = contents.lines().count();
-    println!("{}", line_count);
 
     for i in 0..line_count-3 {
         let first_window = get_window(&contents, i);
@@ -23,7 +22,17 @@ fn main() {
 fn get_window(contents: &str, index: usize) -> i32 {
     let mut sum = 0;
     for i in index..index + 3 {
-        sum += contents.lines().nth(i).unwrap().parse::<i32>().unwrap();
+        match contents.lines().nth(i) {
+            Some::<&str>(line) => {
+                match line.parse::<i32>() {
+                    Ok(num) => sum += num,
+                    Err(_) => println!("Error parsing line: {}", line),
+                }
+            },
+            None => {
+                println!("Error getting line: {}", i);
+            }
+        }
     }
 
     sum
