@@ -3,54 +3,50 @@ use std::fs;
 fn main() {
     let contents = fs::read_to_string("input.txt").expect("Something went wrong reading the file");
 
-
-    let bit_count = 12;
-    let mut rows: Vec<u16> = vec![];
+    let mut rows: Vec<String> = vec![];
     for line in contents.lines() {
-        rows.push(get_bits(line));
+        rows.push(line.to_string())
     }
 
+    let oxygen_value = oxygen(&rows);
+    let co2_value = co2(&rows);
 
+    println!("{}", oxygen_value);
+    println!("{}", co2_value);
+    println!("Result {}", (co2_value as u32 * oxygen_value as u32) as u32);
+
+}
+fn co2(rows: &Vec<String>) -> u16 {
+    let mut filtered_rows: Vec<String> = rows.clone();
     let mut pos = 0;
-    let mut oxygen_rows: Vec<u16> = rows.clone();
     loop {
-        if pos == bit_count {
+        let value = if most_common_bit(&filtered_rows, pos) == 1 { 0 } else { 1 };
+        filtered_rows = filter(filtered_rows, pos, value);
+
+        pos += 1;
+        if filtered_rows.len() == 1 {
             break;
         }
+    }
 
-        let value = most_common_bit(&oxygen_rows, bit_count-1-pos);
-        oxygen_rows = filter_bits(&oxygen_rows, bit_count-1-pos, value);
+    get_bits(&filtered_rows[0])
+}
+
+fn oxygen(rows: &Vec<String>) -> u16 {
+    let mut oxygen_rows: Vec<String> = rows.clone();
+    let mut pos = 0;
+    loop {
+        let value = most_common_bit(&oxygen_rows, pos);
+
+        oxygen_rows = filter(oxygen_rows, pos, value);
+
+        pos += 1;
         if oxygen_rows.len() == 1 {
             break;
         }
-
-        pos += 1;
     }
 
-    println!("{}", oxygen_rows[0]);
-    println!("{:#02b}", oxygen_rows[0]);
-
-    let mut co2_rows: Vec<u16> = rows.clone();
-    pos = 0;
-    loop {
-        if pos == bit_count {
-            break;
-        }
-
-        let value = least_common_bit(&co2_rows, bit_count-1-pos);
-        co2_rows = filter_bits(&co2_rows, bit_count-1-pos, value);
-        if co2_rows.len() == 1 {
-            break;
-        }
-
-        pos += 1;
-    }
-
-    println!("{}", co2_rows[0]);
-    println!("{:#02b}", co2_rows[0]);
-
-    println!("{}", co2_rows[0] as u32 * oxygen_rows[0] as u32);
-
+    get_bits(&oxygen_rows[0])
 }
 
 
@@ -58,40 +54,24 @@ fn get_bits(value: &str) -> u16 {
     let mut bits = 0;
     for i in 0..value.len() {
         let bit = if value.chars().nth(i).take().unwrap() == '1' { 1 } else { 0 };
-        // println!("{}", bit);
         bits |= bit << value.len()-1-i;
     }
     bits
 }
 
-fn least_common_bit(bits: &Vec<u16>, pos: u8) -> u8 {
-    let mut count = 0;
+
+fn most_common_bit(bits: &Vec<String>, pos: usize) -> u8 {
+    let mut count: u16 = 0;
     for i in 0..bits.len() {
-        count += (bits[i] >> pos) & 1;
+        count += bits[i].chars().nth(pos).unwrap().to_digit(10).unwrap() as u16;
     }
 
     let half = (bits.len() as f32 / 2f32).ceil();
-
-    return if count < half as u16 { 1 } else { 0 };
-}
-
-fn most_common_bit(bits: &Vec<u16>, pos: u8) -> u8 {
-    let mut count = 0;
-    for i in 0..bits.len() {
-        count += (bits[i] >> pos) & 1;
-    }
-
-    let half = (bits.len() as f32 / 2f32).ceil();
-
-    return if count >= half as u16 { 1 } else { 0 };
-}
-
-fn filter_bits(bits: &Vec<u16>, pos: u8, value: u8) -> Vec<u16> {
-    bits.into_iter().filter(|x| bit_equals(**x, pos, value)).cloned().collect::<Vec<u16>>()
+    return if count < half as u16 { 0 } else { 1 };
 }
 
 
-fn bit_equals(bits: u16, pos: u8, value: u8) -> bool {
-    let result = bits & 1 << pos == (value as u16) << pos;
-    result
+fn filter(bits: Vec<String>, pos: usize, value: u8) -> Vec<String> {
+    bits.into_iter().filter(|x| x.chars().nth(pos).unwrap().to_digit(10).unwrap() as u8 == value).collect()
 }
+
