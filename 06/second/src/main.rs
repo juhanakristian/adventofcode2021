@@ -9,20 +9,9 @@ fn main() {
         fish_counts[fish as usize] += 1;
     }
 
-    for day in 0..256 {
-        let birth_count = fish_counts[0];
-        fish_counts[0] = fish_counts[1];
-        fish_counts[1] = fish_counts[2];
-        fish_counts[2] = fish_counts[3];
-        fish_counts[3] = fish_counts[4];
-        fish_counts[4] = fish_counts[5];
-        fish_counts[5] = fish_counts[6];
-        fish_counts[6] = fish_counts[7] + birth_count;
-        fish_counts[7] = fish_counts[8];
-        fish_counts[8] = birth_count;
-        
-        let total_fish = fish_counts.iter().sum::<i64>();
-        println!("Day {}, fishes {}", day, total_fish);
+    for _day in 0..256 {
+        fish_counts.rotate_left(1);
+        fish_counts[6] += fish_counts[8];
     }
 
     let total_fish = fish_counts.iter().sum::<i64>();
