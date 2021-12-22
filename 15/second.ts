@@ -1,52 +1,121 @@
 const input = await Deno.readTextFile(Deno.args[0]);
-const iterations = Deno.args[1] ? parseInt(Deno.args[1]) : 10;
 
-const [template, lines] = input.split("\n\n");
+const map = input
+  .split("\n")
+  .map((line) => line.split("").map((c) => parseInt(c)));
 
-const instructions = new Map<string, string>();
+const width = map[0].length;
+const height = map.length;
+// console.log(width, height);
 
-for (const line of lines.split("\n")) {
-  const [pair, character] = line.split(" -> ");
-  instructions.set(pair, character);
+interface Point {
+  x: number;
+  y: number;
 }
 
-console.log(template, instructions);
-
-const letters = new Map<string, number>();
-let pairs = new Map<string, number>();
-
-for (let i = 0; i < template.length - 1; i++) {
-  const pair = template.substring(i, i + 2);
-  pairs.set(pair, (pairs.get(pair) || 0) + 1);
-}
-
-for (const letter of template) {
-  const count = letters.get(letter) || 0;
-  letters.set(letter, count + 1);
-}
-
-console.log(pairs);
-console.log(letters);
-for (let i = 0; i < iterations; i++) {
-  const newPairs = new Map<string, number>();
-  for (const [pair, value] of pairs.entries()) {
-    const character = instructions.get(pair) as string;
-
-    const newPair1 = pair[0] + character;
-    const existingCount1 = newPairs.get(newPair1) || 0;
-    newPairs.set(newPair1, value + existingCount1);
-
-    const newPair2 = character + pair[1];
-    const existingCount2 = newPairs.get(newPair2) || 0;
-    newPairs.set(newPair2, value + existingCount2);
-
-    letters.set(character, (letters.get(character) || 0) + value);
+function isValid(point: Point, width: number, height: number) {
+  if (point.x < 0 || point.y < 0 || point.x >= width || point.y >= height) {
+    return false;
   }
-  pairs = newPairs;
+
+  return true;
 }
 
-// console.log(pairs);
+function neighbours(point: Point, width: number, height: number) {
+  const candidates = [
+    { x: point.x, y: point.y - 1 },
+    { x: point.x, y: point.y + 1 },
+    { x: point.x - 1, y: point.y },
+    { x: point.x + 1, y: point.y },
+  ];
 
-const sorted = [...letters.entries()].sort((a, b) => b[1] - a[1]);
-console.log(sorted);
-console.log(sorted[0][1] - sorted[sorted.length - 1][1]);
+  return candidates.filter((c) => isValid(c, width, height));
+}
+
+function djikstra(
+  map: number[][],
+  start: Point,
+  width: number,
+  height: number
+) {
+  let available: string[] = [];
+  const distances = new Map();
+  const previous = new Map();
+  for (let x = 0; x < width; x++) {
+    for (let y = 0; y < height; y++) {
+      // available.add(`${x}, ${y}`);
+      available.push(`${x}, ${y}`);
+      distances.set(`${x}, ${y}`, Infinity);
+      previous.set(`${x}, ${y}`, null);
+    }
+  }
+
+  distances.set(`0, 0`, 0);
+  // console.log(available);
+
+  const removed = new Set<string>();
+  while (available.length > 0) {
+    available.sort((a, b) => distances.get(a) - distances.get(b));
+
+    if (available.length === 0) break;
+    const current: string = available.shift() as string;
+    removed.add(current);
+
+    const point = {
+      x: parseInt(current.split(", ")[0]),
+      y: parseInt(current.split(", ")[1]),
+    };
+    const n = neighbours(point, width, height);
+    for (const neighbour of n.filter(
+      (n: Point) => !removed.has(`${n.x}, ${n.y}`)
+    )) {
+      const newDistance =
+        distances.get(`${point.x}, ${point.y}`) + map[neighbour.y][neighbour.x];
+      console.log(neighbour);
+      if (newDistance < distances.get(`${neighbour.x}, ${neighbour.y}`)) {
+        distances.set(`${neighbour.x}, ${neighbour.y}`, newDistance);
+        previous.set(`${neighbour.x}, ${neighbour.y}`, current);
+      }
+    }
+  }
+
+  return { distances, previous };
+}
+
+let expandedMap = [];
+for (let i = 0; i < width; i++) {
+  const row = map[i].slice();
+  const length = row.length;
+  for (let j = 0; j < 4; j++) {
+    for (let k = 0; k < length; k++) {
+      const value = (row[k + j * length] + 1) % 10;
+      row.push(value === 0 ? 1 : value);
+    }
+  }
+  expandedMap.push(row);
+}
+
+for (let i = 0; i < 4; i++) {
+  for (let j = 0; j < height; j++) {
+    const row: number[] = expandedMap[i * height + j].map((c: number) => {
+      const value = (c + 1) % 10;
+      return value === 0 ? 1 : value;
+    });
+    expandedMap.push(row);
+  }
+}
+
+// console.log(expandedMap[0]);
+// console.log(expandedMap[expandedMap.length - 1]);
+
+// console.log(map);
+const expandedWidth = 5 * width;
+const expandedHeight = 5 * height;
+const { distances, previous } = djikstra(
+  expandedMap,
+  { x: 0, y: 0 },
+  expandedWidth,
+  expandedHeight
+);
+const end = { x: expandedWidth - 1, y: expandedHeight - 1 };
+console.log(distances.get(`${end.x}, ${end.y}`));
