@@ -33,12 +33,12 @@ function neighbours(point: Point) {
 }
 
 function djikstra(map: number[][], start: Point) {
-  const available = new Set<string>();
+  let available: string[] = [];
   const distances = new Map();
   const previous = new Map();
   for (let x = 0; x < width; x++) {
     for (let y = 0; y < height; y++) {
-      available.add(`${x}, ${y}`);
+      available.push(`${x}, ${y}`);
       distances.set(`${x}, ${y}`, Infinity);
       previous.set(`${x}, ${y}`, null);
     }
@@ -47,20 +47,22 @@ function djikstra(map: number[][], start: Point) {
   distances.set(`0, 0`, 0);
   console.log(available);
 
-  while (available.size > 0) {
-    const current: string = Array.from(available).sort(
-      (a, b) => distances.get(a) - distances.get(b)
-    )[0];
-    available.delete(current);
+  const removed = new Set<string>();
+
+  while (available.length > 0) {
+    available.sort((a, b) => distances.get(a) - distances.get(b));
+
+    if (available.length === 0) break;
+    const current: string = available.shift() as string;
+    removed.add(current);
 
     const point = {
       x: parseInt(current.split(", ")[0]),
       y: parseInt(current.split(", ")[1]),
     };
     const n = neighbours(point);
-    console.log(n);
-    for (const neighbour of n.filter((n: Point) =>
-      available.has(`${n.x}, ${n.y}`)
+    for (const neighbour of n.filter(
+      (n: Point) => !removed.has(`${n.x}, ${n.y}`)
     )) {
       const newDistance =
         distances.get(`${point.x}, ${point.y}`) + map[neighbour.y][neighbour.x];
