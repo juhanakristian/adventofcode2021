@@ -1,67 +1,200 @@
 const input = await Deno.readTextFile(Deno.args[0]);
 
-const ranges = input
-  .replace("target area: ", "")
-  .split(",")
-  .map((a) => a.split("=")[1])
-  .map((a) => a.split("..").map(Number));
-
-const start = [0, 0];
-
-function inTarget(x: number, y: number) {
-  const [x1, x2] = ranges[0];
-  const [y1, y2] = ranges[1];
-  return x >= x1 && x <= x2 && y >= y1 && y <= y2;
+interface Node {
+  left?: Node;
+  right?: Node;
+  parent: Node | null;
+  value?: number;
 }
 
-function checkHit(
-  x: number,
-  y: number
-): number[][] | "overshoot" | "undershoot" {
-  const point = [0, 0];
-  const velocity = [x, y];
-  const trajectory = [point.slice()];
+function parseNode(input: any, parent: Node | null = null): Node {
+  const left = input[0];
+  const right = input[1];
+
+  if (!isNaN(Number(input))) {
+    return {
+      value: Number(input),
+      parent,
+    };
+  }
+
+  const node: Node = {
+    parent,
+  };
+
+  node.left = parseNode(left, node);
+  node.right = parseNode(right, node);
+  return node;
+}
+
+function first(
+  node: Node | undefined,
+  child: "left" | "right"
+): Node | undefined {
+  if (!node) return node;
+
+  if (node.value !== undefined) {
+    return node;
+  }
+
+  return first(node[child] as Node, child);
+}
+
+function addToLeft(node: Node, value: number) {
+  let previous = node;
+  let current = node.parent;
   while (true) {
-    point[0] += velocity[0];
-    point[1] += velocity[1];
-
-    trajectory.push(point.slice());
-
-    if (velocity[0] !== 0)
-      velocity[0] = (Math.abs(velocity[0]) - 1) * (velocity[0] < 0 ? -1 : 1);
-    velocity[1]--;
-
-    if (inTarget(point[0], point[1])) {
-      return trajectory;
+    if (current && current.left !== previous) {
+      const leftToAdd = first(current.left, "right");
+      if (leftToAdd) leftToAdd.value = (leftToAdd.value ?? 0) + value;
+      break;
     }
 
-    if (point[1] < ranges[1][0]) {
-      if (point[0] > ranges[0][1]) {
-        return "overshoot";
-      } else {
-        return "undershoot";
-      }
-    }
+    if (!current?.parent) break;
+
+    previous = current;
+    current = current.parent;
   }
 }
 
-const scanRange = [
-  [-1000, 1000],
-  [-1000, 1000],
-];
-
-let top = -Infinity;
-let results = [];
-for (let x = scanRange[0][0]; x < scanRange[0][1]; x++) {
-  for (let y = scanRange[1][0]; y < scanRange[1][1]; y++) {
-    const hit = checkHit(x, y);
-    if (hit === "overshoot" || hit === "undershoot") {
-      continue;
+function addToRight(node: Node, value: number) {
+  let previous = node;
+  let current = node.parent;
+  while (true) {
+    if (current && current.right !== previous) {
+      const add = first(current.right, "left");
+      if (add) add.value = (add.value ?? 0) + value;
+      break;
     }
 
-    results.push([x, y]);
+    if (!current?.parent) break;
+
+    previous = current;
+    current = current.parent;
   }
 }
 
-// console.log(top);
-console.log(results.length);
+function explode(node: Node) {
+  const left = node.left?.value ?? 0;
+  const right = node.right?.value ?? 0;
+
+  addToRight(node, right);
+  addToLeft(node, left);
+
+  node.left = undefined;
+  node.right = undefined;
+  node.value = 0;
+}
+
+function split(node: Node) {
+  const value = node.value ?? 0;
+
+  node.left = {
+    value: Math.floor(value / 2),
+    parent: node,
+  };
+  node.right = {
+    value: Math.ceil(value / 2),
+    parent: node,
+  };
+
+  node.value = undefined;
+}
+
+function add(left: Node, right: Node) {
+  const root = {
+    left,
+    right,
+    parent: null,
+  };
+
+  left.parent = root;
+  right.parent = root;
+  return root;
+}
+
+function reduce(node: Node, depth: number): boolean {
+  if (depth > 3 && node.value === undefined) {
+    explode(node);
+    return false;
+  }
+
+  if (node.value === undefined) {
+    if (!reduce(node.left as Node, depth + 1)) return false;
+    if (!reduce(node.right as Node, depth + 1)) return false;
+  }
+
+  // if (node.value !== undefined && node.value >= 10) {
+  //   split(node);
+  //   return false;
+  // }
+
+  return true;
+}
+
+function reduceS(node: Node, depth: number): boolean {
+  if (node.value !== undefined && node.value >= 10) {
+    split(node);
+    return false;
+  }
+
+  if (node.value === undefined) {
+    if (!reduceS(node.left as Node, depth + 1)) return false;
+    if (!reduceS(node.right as Node, depth + 1)) return false;
+  }
+
+  return true;
+}
+
+function printNode(node?: Node): string {
+  if (!node) return "";
+  if (node.value !== undefined) {
+    return `${node.value}`;
+  }
+
+  return `[${printNode(node.left)}, ${printNode(node.right)}]`;
+}
+
+function magnitude(node: Node): number {
+  if (node.value !== undefined) return node.value;
+
+  return magnitude(node.left as Node) * 3 + magnitude(node.right as Node) * 2;
+}
+
+function addAndReduce(node1: Node, node2: Node) {
+  const result = add(node1, node2);
+
+  let r = false;
+  let s = false;
+  while (!r || !s) {
+    r = reduce(result, 0);
+    if (r) s = reduceS(result, 0);
+  }
+
+  return result;
+}
+
+const lines = input.split("\n").map((line) => JSON.parse(line.trim()));
+
+let biggestMagnitude = -Infinity;
+for (let i = 0; i < lines.length; i++) {
+  for (let a = 0; a < lines.length; a++) {
+    if (a === i) continue;
+    // console.log(printNode(node1) + " + " + printNode(node2));
+
+    const result1 = addAndReduce(parseNode(lines[i]), parseNode(lines[a]));
+
+    const m1 = magnitude(result1);
+    if (m1 > biggestMagnitude) {
+      biggestMagnitude = m1;
+    }
+
+    const result2 = addAndReduce(parseNode(lines[a]), parseNode(lines[i]));
+
+    const m2 = magnitude(result2);
+    if (m2 > biggestMagnitude) {
+      biggestMagnitude = m2;
+    }
+  }
+}
+console.log("MAGNITUDE", biggestMagnitude);
